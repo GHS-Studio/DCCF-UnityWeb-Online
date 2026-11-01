@@ -1,0 +1,23 @@
+{
+  "name": "dccf-unityweb-online",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.js",
+  "description": "运输船 (Transport Ship) — 跨平台网络 FPS：Windows / Android 客户端 + Node.js 权威服务端",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node scripts/dev.mjs",
+    "build:client": "node scripts/build-client.mjs",
+    "build:win": "node scripts/build-win.mjs",
+    "build:android": "node scripts/build-android.mjs",
+    "test:net": "node scripts/test-net.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2",
+    "three": "^0.169.0"
+  }
+}

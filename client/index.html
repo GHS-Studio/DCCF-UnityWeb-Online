@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>运输船 · 网络联机 FPS</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+
+<!-- 主菜单 -->
+<div id="menu" class="menu">
+  <div class="menu-card">
+    <h1>运输船 <span class="sub">Transport Ship · Online</span></h1>
+    <div id="net-badge" class="badge">网页客户端 · 自动连接当前服务端</div>
+    <div class="field">
+      <label>昵称</label>
+      <input id="name-input" type="text" maxlength="14" placeholder="输入昵称">
+    </div>
+    <div class="field">
+      <label>服务端地址</label>
+      <input id="server-input" type="text" placeholder="留空自动连接">
+      <div id="server-hint" class="hint">格式：IP 或 IP:端口（默认 8080），例如 192.168.1.100:9090</div>
+    </div>
+    <div class="field">
+      <label>鼠标灵敏度</label>
+      <input id="sens" type="range" min="0.2" max="3" step="0.05" value="1">
+      <span id="sens-val">1.00</span>
+    </div>
+    <div class="field">
+      <label>画质</label>
+      <div id="quality-seg" class="seg">
+        <button data-q="high">高</button>
+        <button data-q="low">低</button>
+      </div>
+    </div>
+    <button id="join-btn" class="primary">进入战场</button>
+    <div id="menu-status" class="menu-status"></div>
+    <div class="tips">
+      <div>WASD 移动 · 鼠标视角 · 左键射击 · 右键开镜 · R 换弹 · 空格跳跃 · 1/2/3 切枪 · Tab 计分板</div>
+    </div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hud hidden">
+  <div id="crosshair" class="crosshair"></div>
+  <div id="hitmarker" class="hitmarker"></div>
+  <div id="damage-overlay" class="damage-overlay"></div>
+  <div id="scope" class="scope"></div>
+
+  <div class="hud-top">
+    <div id="scores" class="scores">0 : 0</div>
+    <div id="time" class="time">10:00</div>
+  </div>
+
+  <div class="hud-bottom">
+    <div class="health">
+      <div id="hp-bar" class="hp-bar" style="width:100%"></div>
+      <span id="hp-val">100</span>
+    </div>
+    <div class="weapon-info">
+      <div id="weapon-name">M4A1</div>
+      <div id="ammo">30 / 90</div>
+    </div>
+  </div>
+
+  <div id="stats" class="stats">-- FPS · -- ms</div>
+  <div id="killfeed" class="killfeed"></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- 计分板 -->
+  <div id="scoreboard" class="scoreboard">
+    <table>
+      <thead><tr><th>玩家</th><th>击杀</th><th>死亡</th><th>血量</th></tr></thead>
+      <tbody id="scoreboard-body"></tbody>
+    </table>
+  </div>
+
+  <!-- 死亡画面 -->
+  <div id="death" class="death hidden">
+    <div id="death-count">你已阵亡</div>
+  </div>
+
+  <!-- 暂停 -->
+  <div id="pause" class="pause">
+    <div class="pause-card">
+      <h2>已暂停</h2>
+      <button id="resume-btn">继续</button>
+      <button id="leave-btn" class="danger">离开</button>
+    </div>
+  </div>
+
+  <!-- 触屏控制 -->
+  <div id="touch-controls" class="touch-controls hidden">
+    <div id="joystick" class="joystick"><div id="joy-knob" class="joy-knob"></div></div>
+    <div id="look-area" class="look-area"></div>
+    <button id="btn-fire" class="tbtn fire">射击</button>
+    <button id="btn-jump" class="tbtn jump">跳</button>
+    <button id="btn-reload" class="tbtn reload">R</button>
+    <button id="btn-switch" class="tbtn switch">切</button>
+    <button id="btn-scope" class="tbtn scope">镜</button>
+  </div>
+</div>
+
+<script src="bundle.js"></script>
+</body>
+</html>

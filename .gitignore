@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.zip
+*.apk
+*.idsig
+android-build/
+.electron-cache/
+.android-sdk/
+.venv/
+.uploads/
+__pycache__/
+*.pyc
