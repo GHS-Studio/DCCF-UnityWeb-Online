@@ -13,9 +13,25 @@ import { Room } from './room.js';
 import { PROTOCOL_VERSION } from '../shared/constants.js';
 import { MAP } from '../shared/map.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// 兼容 ESM（import.meta.url）与 CJS bundle（__filename）两种环境
+const _url = import.meta.url;
+const __filename = _url && _url.startsWith('file:') ? fileURLToPath(_url) : _url;
+const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
-const DIST = path.join(ROOT, 'dist', 'client');
+
+// 兼容 pkg 打包 / Electron / 源码运行：依次尝试多个客户端目录
+let DIST;
+{
+  const candidates = [
+    path.join(ROOT, 'dist', 'client'),
+    path.join(ROOT, 'client'),
+    path.join(path.dirname(process.execPath), 'client'),
+  ];
+  for (const c of candidates) {
+    try { if (fs.existsSync(c)) { DIST = c; break; } } catch {}
+  }
+  DIST = DIST || candidates[0];
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -175,7 +191,7 @@ export function startServer({ port, bots = 6, maxTotal = 10 } = {}) {
   };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
   const bots = parseInt(process.env.BOTS || '6', 10);
   startServer({ bots });
 }

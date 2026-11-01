@@ -7,7 +7,7 @@ import { buildClient } from './build-client.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ANDROID_HOME = process.env.ANDROID_HOME || path.join(ROOT, '.android-sdk');
-const BUILD_TOOLS = path.join(ANDROID_HOME, 'build-tools', '34.0.0');
+const BUILD_TOOLS = path.join(ANDROID_HOME, 'build-tools', '35.0.0');
 const PLATFORM = path.join(ANDROID_HOME, 'platforms', 'android-34');
 const OUT = path.join(ROOT, 'dist', 'android');
 const STAGE = path.join(ROOT, 'dist', 'android-build');
@@ -44,7 +44,7 @@ async function main() {
   const androidJar = path.join(PLATFORM, 'android.jar');
   const javaFiles = [];
   for await (const f of walk(javaSrc)) if (f.endsWith('.java')) javaFiles.push(f);
-  run(`javac -source 8 -target 8 -classpath "${androidJar}" -d "${classesDir}" ${javaFiles.map((f) => `"${f}"`).join(' ')}`);
+  run(`javac --release 8 -classpath "${androidJar}" -d "${classesDir}" ${javaFiles.map((f) => `"${f}"`).join(' ')}`);
 
   // classes → dex
   const classesJar = path.join(STAGE, 'classes.jar');
@@ -59,7 +59,7 @@ async function main() {
   run(`"${path.join(BUILD_TOOLS, 'aapt2')}" compile --dir "${resDir}" -o "${resZip}"`);
   const baseApk = path.join(STAGE, 'base.apk');
   const manifest = path.join(ROOT, 'android', 'AndroidManifest.xml');
-  run(`"${path.join(BUILD_TOOLS, 'aapt2')}" link -o "${baseApk}" -I "${androidJar}" --manifest "${manifest}" -R "${resZip}" --min-sdk-version 29 --target-sdk-version 34 --version-code 1 --version-name "1.0"`);
+  run(`"${path.join(BUILD_TOOLS, 'aapt2')}" link -o "${baseApk}" -I "${androidJar}" --manifest "${manifest}" -R "${resZip}" --auto-add-overlay --min-sdk-version 29 --target-sdk-version 34 --version-code 1 --version-name "1.0"`);
 
   // 添加 assets + dex
   run(`cd "${STAGE}" && zip -j "${baseApk}" dex/classes.dex`);

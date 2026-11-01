@@ -19,7 +19,12 @@ async function main() {
   await fs.cp(path.join(ROOT, 'shared'), path.join(STAGE, 'shared'), { recursive: true });
   // 拷贝 package.json（仅运行时依赖）
   const pkg = JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf-8'));
-  const runtimePkg = { name: pkg.name, version: pkg.version, main: 'main.js', dependencies: pkg.dependencies };
+  const runtimePkg = {
+    name: pkg.name, version: pkg.version,
+    type: 'module',
+    main: 'main.js',
+    dependencies: pkg.dependencies,
+  };
   await fs.writeFile(path.join(STAGE, 'package.json'), JSON.stringify(runtimePkg, null, 2));
 
   // 用已下载的 Electron 打包

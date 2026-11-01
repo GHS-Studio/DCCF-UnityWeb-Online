@@ -9,6 +9,7 @@
     "start": "node server/index.js",
     "dev": "node scripts/dev.mjs",
     "build:client": "node scripts/build-client.mjs",
+    "build:server": "node scripts/build-server.mjs",
     "build:win": "node scripts/build-win.mjs",
     "build:android": "node scripts/build-android.mjs",
     "test:net": "node scripts/test-net.mjs"
@@ -18,6 +19,13 @@
   },
   "devDependencies": {
     "esbuild": "^0.24.2",
+    "pkg": "^5.8.1",
     "three": "^0.169.0"
+  },
+  "pkg": {
+    "assets": [
+      "dist/client/**/*"
+    ],
+    "scripts": []
   }
 }

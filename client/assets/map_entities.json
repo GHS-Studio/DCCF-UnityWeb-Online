@@ -1,0 +1,54 @@
+[
+  {
+    "mesh_name": "polySurface528",
+    "position": [
+      0,
+      -2.5,
+      0
+    ],
+    "scale": [
+      1,
+      1,
+      1
+    ]
+  },
+  {
+    "mesh_name": "polySurface588",
+    "position": [
+      0,
+      -2.5,
+      0
+    ],
+    "scale": [
+      1,
+      1,
+      1
+    ]
+  },
+  {
+    "mesh_name": "polySurface620",
+    "position": [
+      0,
+      -2.5,
+      0
+    ],
+    "scale": [
+      1,
+      1,
+      1
+    ]
+  },
+  {
+    "mesh_name": "polySurface621",
+    "position": [
+      0,
+      -2.5,
+      0
+    ],
+    "scale": [
+      1,
+      1,
+      1
+    ]
+  }
+]
