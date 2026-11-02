@@ -107,6 +107,12 @@ export class Room {
         continue;
       }
 
+      // 落水 / 掉出船外
+      if (p.y < MAP.seaLevel - 1) {
+        this._respawn(p, true);
+        continue;
+      }
+
       // 出生保护
       if (p.sp && now - p.spawnAt > PLAYER.spawnProtect * 1000) p.sp = 0;
 
@@ -223,7 +229,7 @@ export class Room {
     }
   }
 
-  _respawn(p) {
+  _respawn(p, drowned = false) {
     const spawn = MAP.spawns[p.tm * 5 + Math.floor(Math.random() * 5)];
     p.x = spawn.x; p.y = spawn.y; p.z = spawn.z;
     p.yw = spawn.yaw; p.pt = 0;
@@ -232,7 +238,7 @@ export class Room {
     p.state = createState(spawn);
     p.spawnAt = Date.now();
     p.aimYaw = spawn.yaw; p.aimPitch = 0;
-    this._pushEvent({ t: 'spawn', id: p.i });
+    this._pushEvent({ t: 'spawn', id: p.i, drowned });
   }
 
   _matchTick() {

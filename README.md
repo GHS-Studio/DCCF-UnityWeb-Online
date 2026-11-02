@@ -13,8 +13,12 @@
 
 ## 功能特性
 
-- 运输船地图（支持加载原始 .unity3d 提取的网格与贴图）
-- 三种武器：M4A1（步枪）、AWM（狙击）、沙漠之鹰（手枪）
+- 全部画面、音效与 UI 均来自原版 `.unity3d` 包（无占位资源）
+- 原版运输船地图网格与贴图
+- 原版完整骨骼角色（36 骨骼、双队模型）与持枪姿态
+- 原版武器模型 / 第一人称武器：步枪、狙击枪、手枪
+- 原版大厅 UI：个人仓库 / 商城 / 选枪 / 角色面板 / 加入战场 / 帮助 / 加载画面
+- 157 个原版音效（枪声、换弹、脚步、命中、死亡、UI、主界面 BGM）
 - 完整的射击、换弹、开镜、爆头、击杀、复活、比分系统
 - 服务端权威物理与命中判定
 - Windows / Android 双平台客户端
@@ -51,7 +55,7 @@ PORT=9090 npm start
 
 ### 客户端连接
 
-1. **网页客户端**：浏览器打开 `http://<服务端IP>:<端口>`，点击「进入战场」
+1. **网页客户端**：浏览器打开 `http://<服务端IP>:<端口>`，点击「加入战斗」进入
 2. **Windows 客户端**：运行 `dist/win/TransportShip-win32-x64/TransportShip.exe`（内置本地服务端）
 3. **Android 客户端**：安装 `dist/android/TransportShip-Android.apk`，在服务端地址栏填写 `IP:端口`（例如 `192.168.1.100:9090`）
 
@@ -71,10 +75,10 @@ PORT=9090 npm start
 # 构建网页客户端
 npm run build:client
 
-# 构建服务端独立 EXE（内置网页客户端资源，Node 16，兼容 Win7+）
+# 构建服务端独立 EXE（内置网页客户端资源，Node 12，兼容 Win7+）
 npm run build:server
 
-# 构建服务端便携压缩包（官方 Node 16 + 客户端资源 + config.ini + 一键启动脚本）
+# 构建服务端便携压缩包（官方 Node 14.17.6 + 客户端资源 + config.ini + 一键启动脚本）
 npm run build:server:portable
 
 # 构建 Windows 便携版客户端（Electron 22，内置本地服务端）
@@ -103,13 +107,19 @@ npm run test:net
 
 ## 原始资源
 
-游戏支持加载从原版 `.unity3d` 提取的原始资源。将以下文件放入 `client/assets/` 目录即可自动使用：
+游戏运行所需的全部资源均已从原版 `.unity3d` 包解出并随客户端打包，无需额外准备：
 
-- 地图：`polySurface528.obj`、`polySurface588.obj`、`polySurface620.obj`、`polySurface621.obj`、`yunshuchuan.png`、`map_entities.json`
-- 武器：`m4a1.obj`、`awm.obj`、`deagle.obj` 及对应 `_tex.png` 贴图
-- 音效：`shot_rifle.wav`、`shot_sniper.wav`、`shot_pistol.wav`
+- 地图：`client/assets/unity/map/`
+- 角色 / 武器：`client/assets/unity/actors/`、`client/assets/unity/weapons/`
+- 音效：`client/assets/unity/audio/`（157 个 WAV + `index.json`）
+- 大厅 UI：`client/assets/unity/ui/`（`level1.json` / `level3.json` + 186 张精灵）
 
-未提供原始资源时，游戏使用程序化生成的纹理与几何兜底。
+如需重新解包，使用 `tools/` 下的脚本（依赖 UnityPy）：
+
+```bash
+/tmp/upvenv/bin/python tools/extract_ui.py
+/tmp/upvenv/bin/python tools/extract_audio.py
+```
 
 ## 项目结构
 

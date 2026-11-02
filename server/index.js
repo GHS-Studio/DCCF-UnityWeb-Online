@@ -108,7 +108,8 @@ export function startServer({ port, bots = 6, maxTotal = 10 } = {}) {
   const room = new Room({ bots, maxTotal });
 
   const server = http.createServer((req, res) => {
-    const url = req.url.split('?')[0];
+    let url = req.url.split('?')[0];
+    try { url = decodeURIComponent(url); } catch { /* 保留原样 */ }
     if (url === '/healthz') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, map: MAP.name, players: room.humanCount }));

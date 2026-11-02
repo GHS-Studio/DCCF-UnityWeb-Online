@@ -1,9 +1,8 @@
-// 客户端入口：菜单 → 连接 → 游戏
+// 客户端入口：原版大厅 → 连接 → 游戏
 import { Net } from './net.js';
 import { Game } from './game.js';
-import { initAudio } from './audio.js';
-
-const $ = (id) => document.getElementById(id);
+import { initAudio, startMenuMusic, stopMenuMusic } from './audio.js';
+import { createLobby } from './lobby.js';
 
 const bridge = typeof window !== 'undefined' ? window.AndroidBridge : null;
 
@@ -36,181 +35,120 @@ const isTouch = !isElectron && (
 );
 const isFileApp = location.protocol === 'file:';
 
-const state = {
-  net: null,
-  game: null,
-  joining: false,
-  settings: {
-    name: load('ts_name', '') || `玩家${String(Math.floor(Math.random() * 9000) + 1000)}`,
-    server: load('ts_server', ''),
-    sens: Number(load('ts_sens', '1')) || 1,
-    quality: load('ts_quality', 'high') === 'low' ? 'low' : 'high',
-  },
+const settings = {
+  name: load('ts_name', '') || `玩家${String(Math.floor(Math.random() * 9000) + 1000)}`,
+  server: load('ts_server', ''),
+  sens: Number(load('ts_sens', '1')) || 1,
+  quality: load('ts_quality', 'high') === 'low' ? 'low' : 'high',
 };
 
-const joinBtn = $('join-btn');
-const statusEl = $('menu-status');
-const nameInput = $('name-input');
-const serverInput = $('server-input');
-const serverHint = $('server-hint');
-const sensInput = $('sens');
-const sensVal = $('sens-val');
-const qualitySeg = $('quality-seg');
+const queryServer = new URLSearchParams(location.search).get('server');
+if (queryServer && !settings.server) settings.server = queryServer;
 
-nameInput.value = state.settings.name;
-serverInput.value = state.settings.server;
-sensInput.value = String(state.settings.sens);
-sensVal.textContent = state.settings.sens.toFixed(2);
+let net = null;
+let game = null;
+let joining = false;
 
-for (const btn of qualitySeg.children) {
-  btn.classList.toggle('on', btn.dataset.q === state.settings.quality);
-}
+const lobby = createLobby({
+  settings,
+  isFileApp,
+  isTouch,
+  onSettings: (patch) => {
+    Object.assign(settings, patch);
+    if ('name' in patch) store('ts_name', settings.name);
+    if ('server' in patch) store('ts_server', settings.server);
+    if ('sens' in patch) {
+      store('ts_sens', String(settings.sens));
+      if (game) game.sensitivity = settings.sens;
+    }
+    if ('quality' in patch) store('ts_quality', settings.quality);
+  },
+  onJoin: ({ name, server, sens, quality }) => connect(name, server, sens, quality),
+});
 
-if (isFileApp) {
-  serverInput.placeholder = '192.168.1.100:8080';
-  serverHint.textContent = '请输入运行服务端的电脑局域网地址（服务端启动时会打印）';
-  const q = new URLSearchParams(location.search).get('server');
-  if (q && !serverInput.value) serverInput.value = q;
-  $('net-badge').textContent = '手机客户端 · 请连接服务端';
-}
-
-if (isTouch) {
-  document.body.classList.add('is-touch');
-  serverInput.setAttribute('inputmode', 'url');
-  serverInput.setAttribute('autocapitalize', 'off');
-  serverInput.setAttribute('autocorrect', 'off');
-}
-
-function setStatus(msg, kind = '') {
-  statusEl.textContent = msg || '';
-  statusEl.className = 'menu-status' + (kind ? ' ' + kind : '');
-}
-
-function resetJoinUI() {
-  state.joining = false;
-  joinBtn.disabled = false;
-  joinBtn.textContent = '进入战场';
-}
-
-function saveSettings() {
-  state.settings.name = nameInput.value.trim() || state.settings.name;
-  state.settings.server = serverInput.value.trim();
-  state.settings.sens = Number(sensInput.value) || 1;
-  store('ts_name', state.settings.name);
-  store('ts_server', state.settings.server);
-  store('ts_sens', String(state.settings.sens));
-  store('ts_quality', state.settings.quality);
-}
-
-function join() {
-  if (state.joining || state.game) return;
-  saveSettings();
-  const name = nameInput.value.trim().slice(0, 14);
-  if (!name) {
-    setStatus('请输入昵称', 'bad');
-    nameInput.focus();
-    return;
-  }
-  const server = serverInput.value.trim();
-  if (isFileApp && !server) {
-    setStatus('请填写服务端地址，例如 192.168.1.100:8080', 'bad');
-    serverInput.focus();
-    return;
-  }
-
+function connect(name, server, sens, quality) {
+  if (joining || game) return;
+  joining = true;
+  stopMenuMusic();
   initAudio();
-  state.joining = true;
-  joinBtn.disabled = true;
-  joinBtn.textContent = '连接中…';
-  setStatus('正在连接服务器…');
 
-  const net = new Net();
-  state.net = net;
+  const n = new Net();
+  net = n;
   let welcomed = false;
 
-  net.connect({ server, name, team: -1 }, {
+  n.connect({ server, name, team: -1 }, {
     onWelcome: (welcome) => {
       if (welcomed) return;
       welcomed = true;
-      state.joining = false;
-      setStatus('');
+      joining = false;
+      lobby.stopLoading();
+      lobby.setStatus('');
       try {
-        state.game = new Game({
+        game = new Game({
           welcome,
-          net,
-          quality: state.settings.quality,
-          sensitivity: state.settings.sens,
+          net: n,
+          quality,
+          sensitivity: sens,
           touch: isTouch,
-          onExit: (reason) => handleExit(reason),
+          onExit: (reason) => exitGame(reason),
         });
+        lobby.hide();
       } catch (err) {
         console.error(err);
-        handleExit('error');
-        setStatus('无法初始化 3D 画面：' + (err?.message || err), 'bad');
-        return;
+        exitGame('error');
+        lobby.setStatus('无法初始化 3D 画面：' + (err?.message || err), 'bad');
       }
-      joinBtn.textContent = '进入战场';
-      joinBtn.disabled = false;
     },
     onError: (msg) => {
-      if (state.game) return;
-      state.joining = false;
-      resetJoinUI();
-      setStatus(msg || '连接错误', 'bad');
+      if (game) return;
+      joining = false;
+      lobby.stopLoading();
+      lobby.setStatus(msg || '连接错误', 'bad');
     },
     onClose: () => {
-      if (state.game) {
-        handleExit('closed');
+      if (game) {
+        exitGame('closed');
         return;
       }
       if (welcomed) return;
-      state.joining = false;
-      resetJoinUI();
-      setStatus('无法连接服务器，请检查地址与服务端是否启动', 'bad');
+      joining = false;
+      lobby.stopLoading();
+      lobby.setStatus('无法连接服务器，请检查地址与服务端是否启动', 'bad');
     },
   });
 }
 
-function handleExit(reason) {
-  if (state.game) {
-    state.game.destroy();
-    state.game = null;
+function exitGame(reason) {
+  if (game) {
+    game.destroy();
+    game = null;
   }
-  if (state.net) {
-    state.net.close();
-    state.net = null;
+  if (net) {
+    net.close();
+    net = null;
   }
-  resetJoinUI();
-  if (reason === 'closed') setStatus('与服务器断开连接', 'bad');
-  else if (reason === 'leave') setStatus('');
-  document.getElementById('menu')?.classList.remove('hidden');
-  document.getElementById('hud')?.classList.add('hidden');
+  joining = false;
+  lobby.show();
+  lobby.stopLoading();
+  if (reason === 'closed') lobby.setStatus('与服务器断开连接', 'bad');
+  else if (reason === 'error') lobby.setStatus('画面初始化失败', 'bad');
+  else lobby.setStatus('');
   if (document.pointerLockElement) {
-    try { document.exitPointerLock(); } catch {}
+    try { document.exitPointerLock(); } catch { /* ignore */ }
   }
+  if (reason !== 'error') startMenuMusic();
 }
 
-joinBtn.addEventListener('click', join);
+// 首次交互后播放原版大厅 BGM（浏览器禁止无手势自动播放）
+document.addEventListener('pointerdown', () => {
+  initAudio();
+  if (game || joining) return;
+  startMenuMusic();
+}, true);
 
-for (const el of [nameInput, serverInput]) {
-  el.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); join(); }
-  });
-}
+window.addEventListener('beforeunload', () => net?.close());
 
-sensInput.addEventListener('input', () => {
-  state.settings.sens = Number(sensInput.value) || 1;
-  sensVal.textContent = state.settings.sens.toFixed(2);
-  if (state.game) state.game.sensitivity = state.settings.sens;
-  store('ts_sens', String(state.settings.sens));
-});
+lobby.show();
 
-qualitySeg.addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-q]');
-  if (!btn) return;
-  state.settings.quality = btn.dataset.q;
-  for (const b of qualitySeg.children) b.classList.toggle('on', b === btn);
-  store('ts_quality', state.settings.quality);
-});
-
-window.addEventListener('beforeunload', () => state.net?.close());
+// 便于调试
+window.__lobby = lobby;

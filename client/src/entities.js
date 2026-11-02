@@ -1,30 +1,28 @@
-// 客户端 3D 实体：远端玩家、第一人称武器、射击特效
+// 客户端 3D 实体：原版角色模型、第一人称原版武器、射击特效
 import * as THREE from 'three';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { PLAYER, WEAPONS, COLORS } from '../../shared/constants.js';
 import { nameTagTexture, flashTexture, impactTexture } from './textures.js';
+import {
+  loadUnityModels, buildModel, buildHeldGun,
+  CHAR_SCALE, CHAR_ROTATION_X, WEAPON_ROTATION_X,
+} from './actors.js';
 
-const ASSET_BASE = (typeof location !== 'undefined' && location.protocol === 'file:')
-  ? (location.href.replace(/[^/]*$/, '') + 'assets/')
-  : 'assets/';
+const AXIS_Y = new THREE.Vector3(0, 1, 0);
+const AXIS_Z = new THREE.Vector3(0, 0, 1);
 
-const G = {
-  torso: new THREE.BoxGeometry(0.56, 0.66, 0.32),
-  head: new THREE.SphereGeometry(0.19, 10, 8),
-  helmet: new THREE.SphereGeometry(0.215, 10, 7, 0, Math.PI * 2, 0, Math.PI / 2),
-  leg: new THREE.BoxGeometry(0.17, 0.78, 0.22),
-  arm: new THREE.BoxGeometry(0.14, 0.62, 0.16),
-  gun: new THREE.BoxGeometry(0.09, 0.12, 0.62),
-  ring: new THREE.RingGeometry(0.42, 0.55, 20),
-};
+// 双手持枪姿态：由原版骨架实测的局部轴角度（local Y 前后摆、local Z 收展）
+const AIM_POSE = [
+  ['M-bone R UpperArm', [[AXIS_Y, 0.8], [AXIS_Z, -0.6]]],
+  ['M-bone R Forearm', [[AXIS_Y, 0.2], [AXIS_Z, 0.2]]],
+  ['M-bone L UpperArm', [[AXIS_Y, 1.46], [AXIS_Z, 0.2]]],
+  ['M-bone L Forearm', [[AXIS_Y, -0.6]]],
+];
+const AIM_QUATS = AIM_POSE.map(([name, list]) => [
+  name,
+  list.map(([axis, ang]) => new THREE.Quaternion().setFromAxisAngle(axis, ang)),
+]);
 
-const M = {
-  skin: new THREE.MeshStandardMaterial({ color: 0xc9a17a, roughness: 0.85 }),
-  dark: new THREE.MeshStandardMaterial({ color: 0x1b2328, roughness: 0.8, metalness: 0.2 }),
-  gun: new THREE.MeshStandardMaterial({ color: 0x24282c, roughness: 0.55, metalness: 0.6 }),
-  teamA: new THREE.MeshStandardMaterial({ color: COLORS.teamA, roughness: 0.75 }),
-  teamB: new THREE.MeshStandardMaterial({ color: COLORS.teamB, roughness: 0.75 }),
-};
+const RING_GEO = new THREE.RingGeometry(0.42, 0.55, 20);
 
 export class Soldier {
   constructor(scene, data) {
@@ -32,58 +30,16 @@ export class Soldier {
     this.name = data.n;
     this.team = data.tm;
     this.bot = data.bt === 1;
+    this.scene = scene;
 
     const g = new THREE.Group();
     this.group = g;
     this.body = new THREE.Group();
     g.add(this.body);
 
-    const teamMat = this.team === 0 ? M.teamA : M.teamB;
-
-    const torso = new THREE.Mesh(G.torso, teamMat);
-    torso.position.y = 1.05;
-    torso.castShadow = true;
-    this.body.add(torso);
-
-    const vest = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.42, 0.36), M.dark);
-    vest.position.y = 1.16;
-    vest.castShadow = true;
-    this.body.add(vest);
-
-    const head = new THREE.Mesh(G.head, M.skin);
-    head.position.y = 1.56;
-    head.castShadow = true;
-    this.body.add(head);
-
-    const helmet = new THREE.Mesh(G.helmet, M.dark);
-    helmet.position.y = 1.60;
-    this.body.add(helmet);
-
-    this.legL = new THREE.Mesh(G.leg, M.dark);
-    this.legL.position.set(-0.15, 0.39, 0);
-    this.legL.castShadow = true;
-    this.body.add(this.legL);
-
-    this.legR = new THREE.Mesh(G.leg, M.dark);
-    this.legR.position.set(0.15, 0.39, 0);
-    this.legR.castShadow = true;
-    this.body.add(this.legR);
-
-    this.armL = new THREE.Mesh(G.arm, teamMat);
-    this.armL.position.set(-0.36, 1.10, 0.04);
-    this.body.add(this.armL);
-
-    this.armR = new THREE.Mesh(G.arm, teamMat);
-    this.armR.position.set(0.36, 1.10, 0.04);
-    this.body.add(this.armR);
-
-    const gun = new THREE.Mesh(G.gun, M.gun);
-    gun.position.set(0.30, 1.18, 0.30);
-    this.body.add(gun);
-
-    const ring = new THREE.Mesh(G.ring, new THREE.MeshBasicMaterial({
-      color: this.team === 0 ? 0xffb03a : 0x4aa8ff,
-      transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false,
+    const ring = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({
+      color: this.team === 0 ? COLORS.teamA : COLORS.teamB,
+      transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false,
     }));
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.02;
@@ -99,7 +55,7 @@ export class Soldier {
     this.tag = tag;
 
     g.position.set(data.x, data.y, data.z);
-    g.rotation.y = data.yw + Math.PI;
+    g.rotation.y = data.yw;
     this.target = { x: data.x, y: data.y, z: data.z, yaw: data.yw, pitch: data.pt || 0 };
     this.alive = data.al === 1;
     this.health = data.hp;
@@ -108,11 +64,94 @@ export class Soldier {
     this.deaths = data.d || 0;
     this.spawnProtected = data.sp === 1;
     g.visible = this.alive;
-    this.phase = Math.random() * Math.PI * 2;
     this.walk = 0;
     this.speedNow = 0;
 
+    this.model = null;
+    this.rest = new Map();
+    this.guns = {};
+    this.loaded = false;
+    this._q = new THREE.Quaternion();
+
     scene.add(g);
+    this._load();
+  }
+
+  _load() {
+    loadUnityModels().then(({ characters, weapons }) => {
+      if (this.disposed) return;
+      const raw = characters[String(this.team)] || characters['0'];
+      if (!raw) return;
+      const model = buildModel(raw, 'unity/actors', {
+        scale: CHAR_SCALE, rotationX: CHAR_ROTATION_X,
+      });
+      // 蒙皮静止姿态以脚底为原点：z 最低点 -2.81 旋转后成为 y，需抬高
+      model.root.position.y = 0.968;
+      this.body.add(model.root);
+      this.model = model;
+
+      for (const b of model.bones) this.rest.set(b.name, b.quaternion.clone());
+
+      const hand = model.byName.get('M-bone R Hand');
+      if (hand) {
+        for (const key of ['rifle', 'sniper', 'pistol']) {
+          if (!weapons[key]) continue;
+          const gun = buildHeldGun(weapons[key], 'unity/weapons');
+          if (!gun) continue;
+          hand.add(gun);
+          this.guns[key] = gun;
+        }
+      }
+      this.loaded = true;
+      this._applyWeapon();
+      this._pose(0, 0);
+    }).catch((err) => console.error('[soldier] 模型加载失败', err));
+  }
+
+  _applyWeapon() {
+    for (const k of Object.keys(this.guns)) this.guns[k].visible = k === this.weapon;
+  }
+
+  _pose(walk, moving) {
+    if (!this.loaded) return;
+    const m = this.model;
+    const rest = this.rest;
+    const qa = this._q;
+
+    for (const [name, qs] of AIM_QUATS) {
+      const bone = m.byName.get(name);
+      const r = rest.get(name);
+      if (!bone || !r) continue;
+      bone.quaternion.copy(r);
+      for (const q of qs) bone.quaternion.multiply(q);
+    }
+
+    const sw = Math.sin(walk) * 0.62 * moving;
+    const bendL = Math.max(0, -Math.sin(walk)) * 0.85 * moving;
+    const bendR = Math.max(0, Math.sin(walk)) * 0.85 * moving;
+
+    const thighL = m.byName.get('M-bone L Thigh');
+    if (thighL && rest.has('M-bone L Thigh')) {
+      qa.setFromAxisAngle(AXIS_Y, sw);
+      thighL.quaternion.copy(rest.get('M-bone L Thigh')).multiply(qa);
+    }
+    const thighR = m.byName.get('M-bone R Thigh');
+    if (thighR && rest.has('M-bone R Thigh')) {
+      qa.setFromAxisAngle(AXIS_Y, -sw);
+      thighR.quaternion.copy(rest.get('M-bone R Thigh')).multiply(qa);
+    }
+    const calfL = m.byName.get('M-bone L Calf');
+    if (calfL && rest.has('M-bone L Calf')) {
+      qa.setFromAxisAngle(AXIS_Y, bendL);
+      calfL.quaternion.copy(rest.get('M-bone L Calf')).multiply(qa);
+    }
+    const calfR = m.byName.get('M-bone R Calf');
+    if (calfR && rest.has('M-bone R Calf')) {
+      qa.setFromAxisAngle(AXIS_Y, bendR);
+      calfR.quaternion.copy(rest.get('M-bone R Calf')).multiply(qa);
+    }
+
+    this.body.position.y = moving > 0.15 ? Math.abs(Math.sin(walk)) * 0.035 : 0;
   }
 
   setData(p) {
@@ -123,9 +162,10 @@ export class Soldier {
     this.team = p.tm;
     this.kills = p.k;
     this.deaths = p.d;
-    this.weapon = p.wp;
+    this.weapon = p.wp || 'rifle';
     this.spawnProtected = p.sp === 1;
     this.group.visible = this.alive;
+    this._applyWeapon();
     if (p.n !== this.name) {
       this.name = p.n;
       this.tag.material.map = nameTagTexture(this.name, this.team === 0 ? 0xffb03a : 0x4aa8ff, this.team);
@@ -148,184 +188,90 @@ export class Soldier {
     }
     this.speedNow = dt > 0 ? dist / dt : 0;
 
-    let dyaw = this.target.yaw + Math.PI - this.group.rotation.y;
+    let dyaw = this.target.yaw - this.group.rotation.y;
     while (dyaw > Math.PI) dyaw -= Math.PI * 2;
     while (dyaw < -Math.PI) dyaw += Math.PI * 2;
     this.group.rotation.y += dyaw * k;
 
-    this.body.rotation.x = -this.target.pitch * 0.45;
+    this.body.rotation.x = -this.target.pitch * 0.35;
 
-    const moving = Math.min(1, this.speedNow / 6);
-    this.walk += dt * (6 + moving * 7);
-    const sw = Math.sin(this.walk) * 0.65 * moving;
-    this.legL.rotation.x = sw;
-    this.legR.rotation.x = -sw;
-    this.armL.rotation.x = -sw * 0.5;
-    this.armR.rotation.x = -0.25 + Math.sin(this.walk) * 0.12 * moving;
-    this.body.position.y = moving > 0.2 ? Math.abs(Math.sin(this.walk)) * 0.04 : 0;
+    const moving = Math.min(1, this.speedNow / 5);
+    this.walk += dt * (5 + moving * 6);
+    this._pose(this.walk, moving);
 
     this.tag.material.opacity = 1;
   }
 
   dispose(scene) {
-    scene.remove(this.group);
+    this.disposed = true;
+    if (scene) scene.remove(this.group);
+    else this.scene?.remove(this.group);
     this.tag.material.map?.dispose();
     this.tag.material.dispose();
   }
 }
 
-// ---------------- 第一人称武器 ----------------
-function boxMesh(size, pos, mat) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), mat);
-  m.position.set(pos[0], pos[1], pos[2]);
-  m.castShadow = false;
-  return m;
-}
-
+// ---------------- 第一人称武器（原版模型 + 手臂） ----------------
 export class ViewModel {
   constructor(camera) {
     this.camera = camera;
-    this.scene = camera.parent;
     this.root = new THREE.Group();
-    this.root.position.set(0.22, -0.20, -0.5);
-    this.root.scale.setScalar(0.72);
+    this.root.position.set(0.20, 0.03, 0.02);
     camera.add(this.root);
 
     this.models = {};
-    this.realModels = {};
-    this.flashes = [];
-    this.flashMap = {};
-
-    const dark = new THREE.MeshStandardMaterial({ color: 0x3b434a, roughness: 0.5, metalness: 0.55 });
-    const mid = new THREE.MeshStandardMaterial({ color: 0x555f68, roughness: 0.45, metalness: 0.55 });
-
-    // M4A1 占位
-    {
-      const g = new THREE.Group();
-      g.add(boxMesh([0.09, 0.11, 0.52], [0, 0, -0.1], dark));
-      g.add(boxMesh([0.075, 0.075, 0.30], [0, 0.01, -0.5], mid));
-      g.add(boxMesh([0.065, 0.20, 0.10], [0, -0.13, 0.02], mid));
-      g.add(boxMesh([0.08, 0.13, 0.30], [0, -0.02, 0.28], dark));
-      g.add(boxMesh([0.05, 0.05, 0.22], [0, 0.06, -0.30], dark));
-      this.addFlash(g, [0, 0.01, -0.78]);
-      this.models.rifle = g;
-    }
-    // AWM 占位
-    {
-      const g = new THREE.Group();
-      g.add(boxMesh([0.09, 0.1, 0.95], [0, 0, -0.2], dark));
-      g.add(boxMesh([0.07, 0.07, 0.42], [0, 0.02, -0.78], mid));
-      g.add(boxMesh([0.12, 0.12, 0.34], [0, 0.02, 0.32], dark));
-      g.add(boxMesh([0.05, 0.06, 0.16], [0, -0.12, 0.05], mid));
-      this.addFlash(g, [0, 0.02, -1.0]);
-      this.models.sniper = g;
-    }
-    // 沙鹰占位
-    {
-      const g = new THREE.Group();
-      g.add(boxMesh([0.075, 0.12, 0.36], [0, 0.02, -0.05], mid));
-      g.add(boxMesh([0.07, 0.20, 0.09], [0, -0.13, 0.06], dark));
-      g.add(boxMesh([0.045, 0.045, 0.14], [0, 0.02, -0.25], dark));
-      this.addFlash(g, [0, 0.02, -0.34]);
-      this.models.pistol = g;
-    }
-
-    for (const key of Object.keys(this.models)) {
-      this.models[key].visible = false;
-      this.root.add(this.models[key]);
-    }
+    this.flashes = {};
     this.current = 'rifle';
-    this.models.rifle.visible = true;
     this.recoil = 0;
     this.bob = 0;
     this.ads = 0;
     this.flashTime = 0;
     this.visible = true;
 
-    this._loadRealWeapons();
+    this._load();
   }
 
-  _loadRealWeapons() {
-    const loader = new OBJLoader();
-    const texLoader = new THREE.TextureLoader();
-    const specs = [
-      { key: 'rifle', obj: 'm4a1.obj', tex: 'm4a1_tex.png', scale: 0.8, pos: [0.22, -0.20, -0.5], rot: [0, -Math.PI / 2, 0], muzzle: [-0.22, 0, 0] },
-      { key: 'sniper', obj: 'awm.obj', tex: 'awm_tex.png', scale: 0.5, pos: [0.22, -0.20, -0.5], rot: [0, Math.PI, 0], muzzle: [0, 0, 0.39] },
-      { key: 'pistol', obj: 'deagle.obj', tex: 'deagle_tex.png', scale: 1.0, pos: [0.22, -0.20, -0.5], rot: [0, -Math.PI / 2, 0], muzzle: [-0.077, 0, 0] },
-    ];
-    for (const s of specs) {
-      const tex = new Promise((res) => {
-        texLoader.load(ASSET_BASE + s.tex, (t) => { t.colorSpace = THREE.SRGBColorSpace; res(t); }, undefined, () => res(null));
-      });
-      const meshP = new Promise((res) => {
-        loader.load(ASSET_BASE + s.obj, (g) => res(g), undefined, () => res(null));
-      });
-      Promise.all([tex, meshP]).then(([t, g]) => {
-        if (!g) return;
-        const mat = new THREE.MeshStandardMaterial({ map: t || null, roughness: 0.7, metalness: 0.3 });
-        g.traverse((c) => { if (c.isMesh) { c.material = mat; c.castShadow = false; } });
-        g.scale.setScalar(s.scale);
-        g.userData._basePos = new THREE.Vector3(s.pos[0], s.pos[1], s.pos[2]);
-        g.userData._baseRot = new THREE.Euler(s.rot[0], s.rot[1], s.rot[2]);
-        g.visible = false;
-        // 放在 scene 中而非 camera 子节点，避免 SwiftShader 渲染 camera 子网格时崩溃
-        this.scene.add(g);
-        this.realModels[s.key] = g;
+  _load() {
+    loadUnityModels().then(({ weapons }) => {
+      for (const key of ['rifle', 'sniper', 'pistol']) {
+        const raw = weapons[key];
+        if (!raw) continue;
+        const model = buildModel(raw, 'unity/weapons', {
+          rotationX: WEAPON_ROTATION_X, shadow: false,
+        });
+        model.root.visible = false;
+        this.root.add(model.root);
+        this.models[key] = model;
 
         const flash = new THREE.Sprite(new THREE.SpriteMaterial({
           map: flashTexture(), color: 0xffd28a, blending: THREE.AdditiveBlending,
           transparent: true, depthWrite: false, depthTest: false,
         }));
-        flash.position.set(s.muzzle[0], s.muzzle[1], s.muzzle[2]);
-        flash.scale.set(0.28, 0.28, 1);
+        if (raw.muzzle) flash.position.set(raw.muzzle[0], raw.muzzle[1], raw.muzzle[2]);
+        flash.scale.set(0.22, 0.22, 1);
         flash.visible = false;
-        g.add(flash);
-        this.flashMap[s.key] = flash;
-
-        this.models[s.key].visible = false;
-        if (s.key === this.current) g.visible = true;
-      }).catch(() => {});
-    }
-  }
-
-  addFlash(parent, pos) {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: flashTexture(), color: 0xffd28a, blending: THREE.AdditiveBlending,
-      transparent: true, depthWrite: false, depthTest: false,
-    }));
-    sprite.position.set(pos[0], pos[1], pos[2]);
-    sprite.scale.set(0.28, 0.28, 1);
-    sprite.visible = false;
-    parent.add(sprite);
-    this.flashes.push(sprite);
+        model.root.add(flash);
+        this.flashes[key] = flash;
+      }
+      this.setWeapon(this.current);
+      this.setAds(this.ads > 0.5);
+    }).catch((err) => console.error('[viewmodel] 武器加载失败', err));
   }
 
   setWeapon(w) {
-    if (!this.models[w]) return;
+    if (!WEAPONS[w]) return;
     this.current = w;
-    for (const k of Object.keys(this.models)) this.models[k].visible = k === w;
-    for (const k of Object.keys(this.realModels)) this.realModels[k].visible = k === w;
-    this.flashes.forEach((f) => { f.visible = false; });
-    for (const k of Object.keys(this.flashMap)) this.flashMap[k].visible = false;
+    for (const key of Object.keys(this.models)) this.models[key].root.visible = key === w;
+    for (const key of Object.keys(this.flashes)) this.flashes[key].visible = false;
   }
 
   triggerFlash() {
-    const realFlash = this.flashMap[this.current];
-    if (realFlash) {
-      realFlash.visible = true;
-      realFlash.material.rotation = Math.random() * Math.PI;
-      const s = 0.24 + Math.random() * 0.16;
-      realFlash.scale.set(s, s, 1);
-    } else {
-      const g = this.models[this.current];
-      if (!g) return;
-      const flash = this.flashes[Object.keys(this.models).indexOf(this.current)];
-      if (flash) {
-        flash.visible = true;
-        flash.material.rotation = Math.random() * Math.PI;
-        const s = 0.24 + Math.random() * 0.16;
-        flash.scale.set(s, s, 1);
-      }
+    const flash = this.flashes[this.current];
+    if (flash) {
+      flash.visible = true;
+      flash.material.rotation = Math.random() * Math.PI;
+      const s = 0.2 + Math.random() * 0.14;
+      flash.scale.set(s, s, 1);
     }
     this.flashTime = 0.06;
     this.recoil = Math.min(1, this.recoil + (this.current === 'sniper' ? 0.6 : 0.35));
@@ -338,9 +284,9 @@ export class ViewModel {
     const showVM = this.visible && !scoped && this.ads < 0.6;
     this.root.visible = showVM;
     this.bob += dt * (6 + moving * 8);
-    const bobAmt = moving * 0.012;
-    const adsPos = new THREE.Vector3(0.0, -0.115, -0.34);
-    const hipPos = new THREE.Vector3(0.22, -0.20, -0.42);
+    const bobAmt = moving * 0.010;
+    const hipPos = new THREE.Vector3(0.20, 0.03, 0.02);
+    const adsPos = new THREE.Vector3(0.10, 0.14, -0.05);
     const pos = hipPos.clone().lerp(adsPos, this.ads);
     pos.x += Math.sin(this.bob) * bobAmt;
     pos.y += Math.cos(this.bob * 2) * bobAmt * 0.7;
@@ -348,29 +294,12 @@ export class ViewModel {
     pos.z += this.recoil * 0.05;
     this.recoil = Math.max(0, this.recoil - dt * 5.5);
     this.root.position.copy(pos);
-    this.root.rotation.z = this.ads * 0.0;
-    this.root.rotation.x = -this.recoil * 0.12 - this.ads * 0.02;
-
-    // 同步真实武器模型到相机
-    const cam = this.camera;
-    const rootQuat = new THREE.Quaternion().setFromEuler(this.root.rotation);
-    for (const key of Object.keys(this.realModels)) {
-      const g = this.realModels[key];
-      const active = key === this.current;
-      g.visible = active && showVM;
-      if (!active) continue;
-      const offset = pos.clone();
-      offset.applyQuaternion(cam.quaternion);
-      g.position.copy(cam.position).add(offset);
-      const baseQuat = new THREE.Quaternion().setFromEuler(g.userData._baseRot);
-      g.quaternion.copy(cam.quaternion).multiply(rootQuat).multiply(baseQuat);
-    }
+    this.root.rotation.x = this.recoil * 0.10 - this.ads * 0.01;
 
     if (this.flashTime > 0) {
       this.flashTime -= dt;
       if (this.flashTime <= 0) {
-        this.flashes.forEach((f) => { f.visible = false; });
-        for (const k of Object.keys(this.flashMap)) this.flashMap[k].visible = false;
+        for (const k of Object.keys(this.flashes)) this.flashes[k].visible = false;
       }
     }
   }

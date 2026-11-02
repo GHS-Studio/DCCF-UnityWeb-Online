@@ -1,135 +1,139 @@
-// WebAudio 音效：优先加载原始 WAV 采样，不存在时使用合成音效
+// 原版音效：直接播放 Unity 包内解出的 WAV（assets/unity/audio）
+// 使用 HTMLAudio 元素池，兼容 file://（Electron/APK）与 http://（浏览器）
 const ASSET_BASE = (typeof location !== 'undefined' && location.protocol === 'file:')
-  ? (location.href.replace(/[^/]*$/, '') + 'assets/')
-  : 'assets/';
+  ? (location.href.replace(/[^/]*$/, '') + 'assets/unity/audio/')
+  : 'assets/unity/audio/';
 
-let ctx = null;
-let noiseBuf = null;
-let master = null;
-const shotBuffers = {};
-let shotsReady = false;
+// 逻辑分类 -> 原始 AudioClip 文件名
+const CATS = {
+  shot_rifle: ['M4A1_SHOOT_1', 'M4A1-S-Beast_SHOOT_2'],
+  shot_sniper: ['G_SHOOT_AWM', 'G_SHOOT_BARRET'],
+  shot_pistol: ['G_SHOOT_DEAGLE_1', 'G_SHOOT_GLOCK_1'],
+  reload_rifle: ['M4A1-S-Beast_Reload', 'M4A1-S-Beast_ClipOut', 'M4A1-S-Beast_ClipIn'],
+  reload_sniper: ['G_RELOAD_AWM', 'G_MZC_AWM_CLIPOUT', 'G_MZC_AWM_CLIPIN'],
+  reload_pistol: ['G_RELOAD_DEAGLE', 'G_MZC_DEAGLE_CLIPOUT', 'G_MZC_DEAGLE_CLIPIN'],
+  empty: ['G_MZC_DEAGLE_BCBACK', 'G_MZC_GLOCK_BCBACK'],
+  step: ['C_RUN_RIGHT_METAL1', 'C_RUN_RIGHT_METAL2', 'C_RUN_RIGHT_METAL3', 'C_RUN_RIGHT_METAL4', 'C_RUN_RIGHT_METAL5', 'C_RUN_RIGHT_METAL6'],
+  hit_metal: ['G_HIT_METAL1', 'G_HIT_METAL2', 'G_HIT_METAL3'],
+  hit_soft: ['G_HIT_DIRT2', 'G_HIT_Carpet1', 'G_HIT_PAPER1'],
+  hit_hard: ['G_HIT_STONE3', 'G_HIT_TREE1', 'G_HIT_TREE2', 'G_HIT_TREE3'],
+  headshot: ['UI_SPECIALKILL2'],
+  death: ['ManDie_HighDamage_BL', 'ManDie_HighDamage_GR', 'WomanDie_HighDamage_BL', 'WomanDie_HighDamage_GR'],
+  spawn: ['WeaponUpgrade_LevelUp'],
+  ui: ['BARRET_SELECT', 'Kucri_Select', 'SHOVEL_SELECT', 'UI_NOTIFY'],
+  bgm_menu: ['Wave_Maintheme'],
+};
+
+const POOL_SIZE = 6;
+const pools = new Map(); // 分类 -> Audio 元素数组
+const failed = new Set();
+let inited = false;
+let menuAudio = null;
+
+function makeUrl(name) {
+  return ASSET_BASE + name + '.wav';
+}
+
+function buildPool(cat) {
+  if (pools.has(cat)) return pools.get(cat);
+  const files = CATS[cat] || [];
+  const list = [];
+  for (const name of files) {
+    for (let i = 0; i < POOL_SIZE; i++) {
+      const a = new Audio();
+      a.preload = 'auto';
+      a.src = makeUrl(name);
+      a.addEventListener('error', () => failed.add(name), { once: true });
+      try { a.load(); } catch { /* 忽略 */ }
+      list.push({ el: a, name });
+    }
+  }
+  pools.set(cat, list);
+  return list;
+}
+
+function preload(cats) {
+  for (const cat of cats) buildPool(cat);
+}
+
+function play(cat, volume = 0.6, rate = 1) {
+  if (!inited) return false;
+  const list = buildPool(cat);
+  if (!list.length) return false;
+  let pickIdx = Math.floor(Math.random() * list.length);
+  for (let i = 0; i < list.length; i++) {
+    const item = list[(pickIdx + i) % list.length];
+    if (failed.has(item.name)) continue;
+    const el = item.el;
+    try {
+      el.volume = Math.max(0, Math.min(1, volume));
+      el.playbackRate = rate;
+      el.currentTime = 0;
+      const p = el.play();
+      if (p && p.catch) p.catch(() => {});
+      return true;
+    } catch { /* 尝试下一个 */ }
+  }
+  return false;
+}
 
 export function initAudio() {
-  if (ctx) {
-    if (ctx.state === 'suspended') ctx.resume();
-    return;
-  }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
-  ctx = new AC();
-  master = ctx.createGain();
-  master.gain.value = 0.9;
-  master.connect(ctx.destination);
-  const len = ctx.sampleRate * 1;
-  noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const data = noiseBuf.getChannelData(0);
-  for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-
-  // 异步加载原始武器射击音效（若 assets 中存在）
-  const shots = {
-    rifle: 'shot_rifle.wav',
-    sniper: 'shot_sniper.wav',
-    pistol: 'shot_pistol.wav',
-  };
-  let loaded = 0;
-  const total = Object.keys(shots).length;
-  for (const [key, file] of Object.entries(shots)) {
-    fetch(ASSET_BASE + file)
-      .then((r) => r.arrayBuffer())
-      .then((ab) => ctx.decodeAudioData(ab))
-      .then((buf) => {
-        shotBuffers[key] = buf;
-        loaded++;
-        if (loaded === total) shotsReady = true;
-      })
-      .catch(() => { loaded++; if (loaded === total) shotsReady = true; });
-  }
-}
-
-function env(node, gain, attack, decay) {
-  const g = ctx.createGain();
-  const t = ctx.currentTime;
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(gain, t + attack);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
-  node.connect(g);
-  g.connect(master);
-  return g;
-}
-
-function noiseShot(gain, decay, filterFreq, type = 'lowpass') {
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuf;
-  src.playbackRate.value = 1;
-  const f = ctx.createBiquadFilter();
-  f.type = type;
-  f.frequency.value = filterFreq;
-  src.connect(f);
-  env(f, gain, 0.004, decay);
-  src.start();
-  src.stop(ctx.currentTime + decay + 0.1);
-}
-
-function tone(freq, gain, decay, type = 'sine') {
-  const osc = ctx.createOscillator();
-  osc.type = type;
-  osc.frequency.value = freq;
-  env(osc, gain, 0.005, decay);
-  osc.start();
-  osc.stop(ctx.currentTime + decay + 0.1);
+  if (inited) return;
+  inited = true;
+  // 只预载游戏高频音效，BGM 在需要时再加载
+  preload(['shot_rifle', 'shot_sniper', 'shot_pistol', 'reload_rifle', 'reload_sniper', 'reload_pistol',
+    'empty', 'step', 'hit_metal', 'hit_soft', 'hit_hard', 'headshot', 'death', 'spawn', 'ui']);
 }
 
 export function sfxShot(weapon = 'rifle', own = false) {
-  if (!ctx) return;
-  // 优先播放原始采样
-  if (shotsReady && shotBuffers[weapon]) {
-    const src = ctx.createBufferSource();
-    src.buffer = shotBuffers[weapon];
-    const g = ctx.createGain();
-    const vol = own ? 0.85 : 0.45;
-    g.gain.value = vol;
-    src.connect(g);
-    g.connect(master);
-    src.start();
-    return;
-  }
-  // 回退到合成音效
-  const g = own ? 0.5 : 0.32;
-  if (weapon === 'sniper') {
-    noiseShot(g * 1.2, 0.14, 2400, 'lowpass');
-    tone(70, 0.25, 0.2, 'square');
-  } else if (weapon === 'pistol') {
-    noiseShot(g * 0.9, 0.09, 4200, 'bandpass');
-  } else {
-    noiseShot(g, 0.075, 3200, 'lowpass');
-    tone(110, 0.08, 0.05, 'triangle');
-  }
+  const cat = weapon === 'sniper' ? 'shot_sniper' : weapon === 'pistol' ? 'shot_pistol' : 'shot_rifle';
+  const rate = 1 + (Math.random() * 0.06 - 0.03);
+  play(cat, own ? 0.85 : 0.42, rate);
 }
 
 export function sfxHit(head = false) {
-  if (!ctx) return;
-  tone(head ? 1250 : 820, 0.16, 0.05, 'square');
+  if (head) play('headshot', 0.5);
+  else play(['hit_soft', 'hit_metal', 'hit_hard'][Math.floor(Math.random() * 3)], 0.42, 1 + Math.random() * 0.1);
 }
 
 export function sfxDeath() {
-  if (!ctx) return;
-  tone(220, 0.2, 0.3, 'sawtooth');
-  tone(140, 0.12, 0.45, 'sine');
+  play('death', 0.55, 1 + Math.random() * 0.05);
 }
 
-export function sfxReload() {
-  if (!ctx) return;
-  tone(520, 0.08, 0.03, 'square');
-  setTimeout(() => tone(320, 0.06, 0.03, 'square'), 220);
+export function sfxReload(weapon = 'rifle') {
+  const cat = weapon === 'sniper' ? 'reload_sniper' : weapon === 'pistol' ? 'reload_pistol' : 'reload_rifle';
+  play(cat, 0.65);
 }
 
 export function sfxEmpty() {
-  if (!ctx) return;
-  tone(180, 0.05, 0.03, 'square');
+  play('empty', 0.4);
 }
 
 export function sfxSpawn() {
-  if (!ctx) return;
-  tone(660, 0.1, 0.12, 'sine');
-  setTimeout(() => tone(880, 0.12, 0.15, 'sine'), 120);
+  play('spawn', 0.5);
+}
+
+export function sfxStep(sprint = false) {
+  play('step', sprint ? 0.34 : 0.24, 1 + (Math.random() * 0.08 - 0.04));
+}
+
+export function sfxUiClick() {
+  play('ui', 0.4, 1 + (Math.random() * 0.04 - 0.02));
+}
+
+export function startMenuMusic() {
+  if (!inited || menuAudio) return;
+  const a = new Audio(makeUrl(CATS.bgm_menu[0]));
+  a.loop = true;
+  a.volume = 0.32;
+  a.preload = 'auto';
+  const p = a.play();
+  if (p && p.catch) p.catch(() => {});
+  menuAudio = a;
+}
+
+export function stopMenuMusic() {
+  if (!menuAudio) return;
+  try { menuAudio.pause(); menuAudio.currentTime = 0; } catch { /* 忽略 */ }
+  menuAudio = null;
 }

@@ -23,15 +23,20 @@ async function copyAssets() {
   await fs.mkdir(OUT, { recursive: true });
   const srcAssets = path.join(ROOT, 'client', 'assets');
   const dstAssets = path.join(OUT, 'assets');
+  await fs.rm(dstAssets, { recursive: true, force: true });
   await fs.mkdir(dstAssets, { recursive: true });
   try {
-    const entries = await fs.readdir(srcAssets, { withFileTypes: true });
-    await Promise.all(entries.map((e) => {
-      if (e.isFile()) return fs.copyFile(path.join(srcAssets, e.name), path.join(dstAssets, e.name));
-    }));
+    await fs.cp(srcAssets, dstAssets, { recursive: true });
   } catch { /* assets 目录可能尚未生成 */ }
+  const ver = Date.now().toString(36);
+  const html = await fs.readFile(path.join(ROOT, 'client', 'index.html'), 'utf8');
   await Promise.all([
-    fs.copyFile(path.join(ROOT, 'client', 'index.html'), path.join(OUT, 'index.html')),
+    fs.writeFile(
+      path.join(OUT, 'index.html'),
+      html
+        .replace('href="style.css"', `href="style.css?v=${ver}"`)
+        .replace('src="bundle.js"', `src="bundle.js?v=${ver}"`),
+    ),
     fs.copyFile(path.join(ROOT, 'client', 'style.css'), path.join(OUT, 'style.css')),
   ]);
 }

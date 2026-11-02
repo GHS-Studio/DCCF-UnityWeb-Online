@@ -9,7 +9,7 @@ import { buildWorld } from './world.js';
 import { Soldier, ViewModel, Effects } from './entities.js';
 import { HUD } from './hud.js';
 import {
-  initAudio, sfxShot, sfxHit, sfxDeath, sfxReload, sfxEmpty, sfxSpawn,
+  initAudio, sfxShot, sfxHit, sfxDeath, sfxReload, sfxEmpty, sfxSpawn, sfxStep,
 } from './audio.js';
 import { TouchControls } from './touch.js';
 
@@ -324,7 +324,7 @@ export class Game {
     this.scoped = false;
     this.hud.setScope(false);
     this.viewModel.setAds(false);
-    sfxReload();
+    sfxReload(this.weapon);
     this.hud.setWeapon(this.weapon, this.ammo[this.weapon], this.reserve[this.weapon], true);
   }
 
@@ -612,6 +612,20 @@ export class Game {
       simulate(this.state, { fwd, strafe, jump: now < this.jumpUntil, sprint: this.sprinting(), yaw: this.yaw }, dt, this.colliders);
     }
 
+    // 原版金属脚步音效：按移动距离触发
+    if (!this.paused && this.alive && this.state.onGround) {
+      const spd = Math.hypot(this.state.vx, this.state.vz);
+      if (spd > 1.5) {
+        this._stepDist = (this._stepDist || 0) + spd * dt;
+        if (this._stepDist >= 2.0) {
+          this._stepDist = 0;
+          sfxStep(this.sprinting());
+        }
+      } else {
+        this._stepDist = 0;
+      }
+    }
+
     this.sendInput(dt, this.paused);
 
     const eyeY = this.state.y + PLAYER.eye;
@@ -636,7 +650,7 @@ export class Game {
 
     for (const s of this.soldiers.values()) s.update(dt);
     this.effects.update(dt);
-    this.world.update(dt);
+    this.world.update(dt, this.camera);
 
     try {
       this.renderer.render(this.scene, this.camera);
