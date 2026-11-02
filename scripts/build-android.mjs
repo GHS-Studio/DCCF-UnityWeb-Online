@@ -59,7 +59,7 @@ async function main() {
   run(`"${path.join(BUILD_TOOLS, 'aapt2')}" compile --dir "${resDir}" -o "${resZip}"`);
   const baseApk = path.join(STAGE, 'base.apk');
   const manifest = path.join(ROOT, 'android', 'AndroidManifest.xml');
-  run(`"${path.join(BUILD_TOOLS, 'aapt2')}" link -o "${baseApk}" -I "${androidJar}" --manifest "${manifest}" -R "${resZip}" --auto-add-overlay --min-sdk-version 29 --target-sdk-version 34 --version-code 1 --version-name "1.0"`);
+  run(`"${path.join(BUILD_TOOLS, 'aapt2')}" link -o "${baseApk}" -I "${androidJar}" --manifest "${manifest}" -R "${resZip}" --auto-add-overlay --min-sdk-version 29 --target-sdk-version 34 --version-code 2 --version-name "1.0.1"`);
 
   // 添加 assets + dex
   run(`cd "${STAGE}" && zip -j "${baseApk}" dex/classes.dex`);

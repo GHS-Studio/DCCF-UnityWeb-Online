@@ -35,9 +35,11 @@ const isTouch = !isElectron && (
 );
 const isFileApp = location.protocol === 'file:';
 
+const DEFAULT_SERVER = '111.170.163.145:28888';
+
 const settings = {
   name: load('ts_name', '') || `玩家${String(Math.floor(Math.random() * 9000) + 1000)}`,
-  server: load('ts_server', ''),
+  server: load('ts_server', '') || DEFAULT_SERVER,
   sens: Number(load('ts_sens', '1')) || 1,
   quality: load('ts_quality', 'high') === 'low' ? 'low' : 'high',
 };
@@ -104,6 +106,7 @@ function connect(name, server, sens, quality) {
       joining = false;
       lobby.stopLoading();
       lobby.setStatus(msg || '连接错误', 'bad');
+      lobby.openJoin();
     },
     onClose: () => {
       if (game) {
@@ -114,6 +117,7 @@ function connect(name, server, sens, quality) {
       joining = false;
       lobby.stopLoading();
       lobby.setStatus('无法连接服务器，请检查地址与服务端是否启动', 'bad');
+      lobby.openJoin();
     },
   });
 }

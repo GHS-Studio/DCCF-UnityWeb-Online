@@ -98,7 +98,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .lobby-layer { position: absolute; inset: 0; }
 .lobby-layer .ui-node, .lobby-char .ui-node { position: absolute; pointer-events: none; }
 .ui-text { overflow: visible; }
-.ui-btn { pointer-events: auto; cursor: pointer; }
+.ui-btn, .lobby-layer .ui-node.ui-btn, .lobby-char .ui-node.ui-btn { pointer-events: auto; cursor: pointer; }
 .ui-btn:hover { filter: brightness(1.18); }
 .ui-btn.tab-active::after {
   content: ''; position: absolute; left: 2px; right: 2px; bottom: 0; height: 2px;

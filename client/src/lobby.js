@@ -9,6 +9,8 @@ const SPR = 'assets/unity/ui/sprites/';
 const W = 800;
 const H = 600;
 
+const DEFAULT_SERVER = '111.170.163.145:28888';
+
 const rgba = (c) => `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${c[3]})`;
 
 function cssRect(r) {
@@ -187,6 +189,11 @@ export function createLobby(options) {
           el.addEventListener('click', (e) => {
             e.stopPropagation();
             handleAction(action, key, i);
+          });
+        } else {
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setStatus('该功能暂未开放');
           });
         }
       }
@@ -435,7 +442,7 @@ export function createLobby(options) {
       case 'tab-tool': setTab(key, 'tool'); break;
       case 'shop': showScene('level3'); break;
       case 'house': showScene('level1'); break;
-      case 'play': openJoin(); break;
+      case 'play': quickJoin(); break;
       case 'help': openHelp(key); break;
       case 'bag': showCharPanel(false); break;
       case 'player-panel': showCharPanel(true); break;
@@ -619,6 +626,24 @@ export function createLobby(options) {
     if (e.key === 'Enter') { e.preventDefault(); startJoin(); }
   });
 
+  function beginJoin(name, server) {
+    settings.name = name;
+    settings.server = server;
+    settings.sens = Number(sensInput.value) || 1;
+    onSettings?.({ name, server, sens: settings.sens, quality: settings.quality });
+    joining = true;
+    startLoading();
+    onJoin?.({ name, server, sens: settings.sens, quality: settings.quality });
+  }
+
+  // 「开始游戏」：直接连接默认服务器进入局内，失败时再弹出加入对话框
+  function quickJoin() {
+    if (joining) return;
+    const name = (settings.name || '').trim().slice(0, 14) || '玩家';
+    const server = (settings.server || '').trim() || DEFAULT_SERVER;
+    beginJoin(name, server);
+  }
+
   function startJoin() {
     if (joining) return;
     const name = nameInput.value.trim().slice(0, 14);
@@ -636,13 +661,7 @@ export function createLobby(options) {
       return;
     }
     hint.classList.remove('bad');
-    settings.name = name;
-    settings.server = server;
-    settings.sens = Number(sensInput.value) || 1;
-    onSettings?.({ name, server, sens: settings.sens, quality: settings.quality });
-    joining = true;
-    startLoading();
-    onJoin?.({ name, server, sens: settings.sens, quality: settings.quality });
+    beginJoin(name, server);
   }
   confirmBtn.addEventListener('click', (e) => { e.stopPropagation(); startJoin(); });
 
