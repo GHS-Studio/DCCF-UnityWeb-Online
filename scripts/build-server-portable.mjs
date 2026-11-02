@@ -11,7 +11,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
 const PKG_DIR = path.join(DIST, 'server-portable', 'TransportShip-Server');
 const ZIP_OUT = path.join(DIST, 'TransportShip-Server-Portable.zip');
-const NODE_ZIP = path.join(ROOT, '.node-cache', 'node-v16.20.2-win-x64.zip');
+const NODE_TAG = 'node-v14.21.3-win-x64'; // Node 14 是最后支持 Windows 7 SP1 的版本
+const NODE_ZIP = path.join(ROOT, '.node-cache', `${NODE_TAG}.zip`);
 
 async function main() {
   await buildClient({ minify: true });
@@ -25,7 +26,7 @@ async function main() {
     bundle: true,
     format: 'cjs',
     platform: 'node',
-    target: ['node16'],
+    target: ['node14'],
     outfile: path.join(PKG_DIR, 'server.bundle.cjs'),
     logLevel: 'warning',
     legalComments: 'none',
@@ -35,14 +36,14 @@ async function main() {
   // 2. 客户端静态资源
   await fs.cp(path.join(DIST, 'client'), path.join(PKG_DIR, 'client'), { recursive: true });
 
-  // 3. 官方 Node 16 运行时（Win7 SP1+ 可用）
+  // 3. 官方 Node 14 运行时（Win7 SP1+ 可用）
   await fs.access(NODE_ZIP).catch(() => {
-    throw new Error(`未找到 Node 运行时: ${NODE_ZIP}\n请下载 node-v16.20.2-win-x64.zip 到 .node-cache/`);
+    throw new Error(`未找到 Node 运行时: ${NODE_ZIP}\n请下载 ${NODE_TAG}.zip 到 .node-cache/`);
   });
   const tmp = path.join(DIST, 'server-portable', '_node');
   await fs.mkdir(tmp, { recursive: true });
-  execSync(`unzip -q -o "${NODE_ZIP}" node-v16.20.2-win-x64/node.exe node-v16.20.2-win-x64/LICENSE -d "${tmp}"`, { stdio: 'inherit' });
-  const nodeDir = path.join(tmp, 'node-v16.20.2-win-x64');
+  execSync(`unzip -q -o "${NODE_ZIP}" "${NODE_TAG}/node.exe" "${NODE_TAG}/LICENSE" -d "${tmp}"`, { stdio: 'inherit' });
+  const nodeDir = path.join(tmp, NODE_TAG);
   await fs.copyFile(path.join(nodeDir, 'node.exe'), path.join(PKG_DIR, 'node.exe'));
   await fs.copyFile(path.join(nodeDir, 'LICENSE'), path.join(PKG_DIR, 'NODE-LICENSE.txt'));
   await fs.rm(tmp, { recursive: true, force: true });
@@ -65,6 +66,7 @@ async function main() {
     'chcp 65001 >nul',
     'cd /d "%~dp0"',
     'title Transport Ship Server',
+    'set NODE_SKIP_PLATFORM_CHECK=1',
     'echo ==========================================',
     'echo   Transport Ship Server - Starting...',
     'echo   Config file: config.ini  (port setting)',
@@ -91,6 +93,10 @@ async function main() {
   await fs.writeFile(path.join(PKG_DIR, '使用说明.txt'), [
     '运输船服务端 · 使用说明',
     '==========================================',
+    '',
+    '【系统要求】',
+    'Windows 7 SP1 / 8 / 8.1 / 10 / 11（64 位），无需安装 Node 或 VC++ 运行库。',
+    '包内 node.exe 为 Node 14.21.3，是最后一个官方支持 Windows 7 SP1 的版本。',
     '',
     '【一键启动】',
     '双击「启动服务端.bat」，窗口出现 "运输船服务端已启动" 即成功。',
