@@ -74,6 +74,9 @@ npm run build:client
 # 构建服务端独立 EXE（内置网页客户端资源，Node 16，兼容 Win7+）
 npm run build:server
 
+# 构建服务端便携压缩包（官方 Node 16 + 客户端资源 + config.ini + 一键启动脚本）
+npm run build:server:portable
+
 # 构建 Windows 便携版客户端（Electron 22，内置本地服务端）
 npm run build:win
 

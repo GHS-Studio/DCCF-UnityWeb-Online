@@ -47,6 +47,25 @@ const MIME = {
   '.ico': 'image/x-icon',
 };
 
+// 读取 config.ini 中的端口配置（与脚本/EXE 同目录）
+function readConfigPort() {
+  const dirs = [__dirname];
+  try { dirs.push(path.dirname(process.execPath)); } catch {}
+  for (const dir of dirs) {
+    try {
+      const txt = fs.readFileSync(path.join(dir, 'config.ini'), 'utf8').replace(/^\uFEFF/, '');
+      for (const line of txt.split(/\r?\n/)) {
+        const m = line.match(/^\s*(?:port|端口)\s*[=:：]\s*(\d{1,5})\s*(?:[;#].*)?$/i);
+        if (m) {
+          const p = parseInt(m[1], 10);
+          if (p > 0 && p < 65536) return p;
+        }
+      }
+    } catch { /* 无配置文件则跳过 */ }
+  }
+  return null;
+}
+
 function parsePort() {
   // 1. 命令行 --port
   const argv = process.argv.slice(2);
@@ -66,7 +85,10 @@ function parsePort() {
     const p = parseInt(process.env.PORT, 10);
     if (p > 0 && p < 65536) return p;
   }
-  // 3. 默认
+  // 3. config.ini
+  const fromIni = readConfigPort();
+  if (fromIni) return fromIni;
+  // 4. 默认
   return 8080;
 }
 

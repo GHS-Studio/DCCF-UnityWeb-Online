@@ -10,6 +10,7 @@
     "dev": "node scripts/dev.mjs",
     "build:client": "node scripts/build-client.mjs",
     "build:server": "node scripts/build-server.mjs",
+    "build:server:portable": "node scripts/build-server-portable.mjs",
     "build:win": "node scripts/build-win.mjs",
     "build:android": "node scripts/build-android.mjs",
     "test:net": "node scripts/test-net.mjs"
