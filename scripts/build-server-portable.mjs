@@ -11,7 +11,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
 const PKG_DIR = path.join(DIST, 'server-portable', 'TransportShip-Server');
 const ZIP_OUT = path.join(DIST, 'TransportShip-Server-Portable.zip');
-const NODE_TAG = 'node-v14.21.3-win-x64'; // Node 14 是最后支持 Windows 7 SP1 的版本
+const NODE_TAG = 'node-v14.17.6-win-x64'; // 14.17.6 为 libuv 升级前版本，避免 Win7 缺失 GetHostNameW
 const NODE_ZIP = path.join(ROOT, '.node-cache', `${NODE_TAG}.zip`);
 
 async function main() {
@@ -96,7 +96,7 @@ async function main() {
     '',
     '【系统要求】',
     'Windows 7 SP1 / 8 / 8.1 / 10 / 11（64 位），无需安装 Node 或 VC++ 运行库。',
-    '包内 node.exe 为 Node 14.21.3，是最后一个官方支持 Windows 7 SP1 的版本。',
+    '包内 node.exe 为 Node 14.17.6（libuv 升级前版本），可在 Windows 7 SP1 运行。',
     '',
     '【一键启动】',
     '双击「启动服务端.bat」，窗口出现 "运输船服务端已启动" 即成功。',

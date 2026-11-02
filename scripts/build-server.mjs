@@ -22,7 +22,7 @@ async function main() {
     bundle: true,
     format: 'cjs',
     platform: 'node',
-    target: ['node14'],
+    target: ['node12'],
     outfile: BUNDLE,
     logLevel: 'warning',
     legalComments: 'none',
@@ -39,7 +39,7 @@ async function main() {
   const cmd = [
     `"${pkgBin}"`,
     `"${BUNDLE}"`,
-    '--targets node14-win-x64',
+    '--targets node12-win-x64',
     `--output "${EXE}"`,
   ].join(' ');
   console.log('[build]', cmd);

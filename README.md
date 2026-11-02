@@ -9,7 +9,7 @@
 | Windows 客户端 / 服务端 | Windows 7 SP1（64 位），Win8 / 8.1 / 10 / 11 均可 |
 | Android 客户端 | Android 10（API 29）及以上 |
 
-> 打包采用 Electron 22 + Node 14，可直接运行，无需安装任何运行库或服务。服务端推荐使用便携压缩包（内置 Node 14 运行时，官方支持 Windows 7 SP1）。
+> 打包采用 Electron 22 + Node 14.17.6（便携包）/ Node 12（服务端 EXE），可直接运行，无需安装任何运行库或服务。两者均可在 Windows 7 SP1 上运行。
 
 ## 功能特性
 
