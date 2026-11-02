@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "description": "运输船 (Transport Ship) — 跨平台网络 FPS：Windows / Android 客户端 + Node.js 权威服务端",
   "scripts": {
     "start": "node server/index.js",

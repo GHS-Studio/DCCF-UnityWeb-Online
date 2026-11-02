@@ -25,6 +25,7 @@ let DIST;
   const candidates = [
     path.join(ROOT, 'dist', 'client'),
     path.join(ROOT, 'client'),
+    path.join(__dirname, 'client'), // Electron：server.bundle.cjs 与 client/ 同级
     path.join(path.dirname(process.execPath), 'client'),
   ];
   for (const c of candidates) {

@@ -1,6 +1,15 @@
 # 运输船 · 网络联机 FPS (DCCF-UnityWeb-Online)
 
-基于原版《穿越火线：运输船》UnityWeb 游戏改造的多人联机 FPS。客户端使用 Three.js 渲染，服务端为 Node.js 权威服务器，支持 Windows 与 Android 10+。
+基于原版《穿越火线：运输船》UnityWeb 游戏改造的多人联机 FPS。客户端使用 Three.js 渲染，服务端为 Node.js 权威服务器，支持 Windows 7 SP1+ 与 Android 10+。
+
+## 系统要求
+
+| 平台 | 最低要求 |
+|------|----------|
+| Windows 客户端 / 服务端 | Windows 7 SP1（64 位），Win8 / 8.1 / 10 / 11 均可 |
+| Android 客户端 | Android 10（API 29）及以上 |
+
+> 打包采用 Electron 22 + Node 16，两者均为最后一个支持 Windows 7 / 8 / 8.1 的版本，可直接运行，无需安装任何运行库或服务。
 
 ## 功能特性
 
@@ -62,7 +71,10 @@ PORT=9090 npm start
 # 构建网页客户端
 npm run build:client
 
-# 构建 Windows 便携版（需要 Electron）
+# 构建服务端独立 EXE（内置网页客户端资源，Node 16，兼容 Win7+）
+npm run build:server
+
+# 构建 Windows 便携版客户端（Electron 22，内置本地服务端）
 npm run build:win
 
 # 构建 Android APK（需要 Android SDK）
