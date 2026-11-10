@@ -80,18 +80,8 @@ else
 fi
 echo "- 解压完成"
 
-# 4. 所有者与用户组全部归应用自己（目录本身 + 全部子文件、子文件夹）
-echo "- 还原所有者 uid=${APP_UID}"
-chown -R "${APP_UID}:${APP_UID}" "${DATA_DIR}" || { echo "! chown 失败"; exit 1; }
-
-# 5. 权限全部 771（目录本身 + 全部子文件、子文件夹）
-echo "- 设置权限 771"
-chmod -R 771 "${DATA_DIR}" || { echo "! chmod 失败"; exit 1; }
-
-# 恢复 SELinux 上下文
-restorecon -R "${DATA_DIR}" 2>/dev/null
-
-# 清理临时文件
+# 4. 清理临时文件
+# 注意：tar.gz 备份本身包含文件权限与属主信息，cp -a 已原样保留，无需再 chown/chmod
 rm -rf "${STAGE}" "${ARCHIVE}"
 
 echo "- 完成！校验："
