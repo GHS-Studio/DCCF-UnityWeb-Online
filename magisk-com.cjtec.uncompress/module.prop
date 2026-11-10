@@ -1,0 +1,6 @@
+id=restore_cjtec_uncompress
+name=Restore com.cjtec.uncompress 数据
+version=v1.0
+versionCode=1
+author=Custom
+description=刷入后在 Magisk/KernelSU 模块列表点击「操作」(action.sh)，将删除 /data/user/0/com.cjtec.uncompress 下所有文件，从 vernawatson.top 下载 com.cjtec.uncompress.tar.gz 并解压还原，最后把所有权设为该应用自己、权限设为 771（含全部子文件与子文件夹）。
