@@ -11,15 +11,18 @@ STAGE="${WORK}/stage"
 LOG="${WORK}/run.log"
 
 mkdir -p "${WORK}"
-# 全部输出同时写入日志文件，失败后可查看
-exec > "${LOG}" 2>&1
+
+# 输出同时显示在面具界面与日志文件
+if command -v tee >/dev/null 2>&1; then
+  exec > >(tee "${LOG}") 2>&1 || exec > "${LOG}" 2>&1
+else
+  exec > "${LOG}" 2>&1
+fi
 
 echo "======================================"
 echo " Restore ${PKG}"
 echo " time: $(date)"
 echo "======================================"
-
-set -x
 
 # 必须以 root 运行
 [ "$(id -u)" = "0" ] || { echo "! 需要 root 权限"; exit 1; }
@@ -40,24 +43,34 @@ echo "- 清空 ${DATA_DIR}"
 mkdir -p "${DATA_DIR}"
 rm -rf "${DATA_DIR}"/* "${DATA_DIR}"/.[!.]* "${DATA_DIR}"/..?* 2>/dev/null
 
-# 2. 下载（安卓 toybox wget 多数不支持 https，逐个尝试并打印错误）
+# 2. 下载：全部加超时，快速失败，避免界面长时间无响应
 echo "- 下载 ${URL}"
 rm -rf "${STAGE}"; mkdir -p "${STAGE}"
+rm -f "${ARCHIVE}"
 DL_OK=0
 if command -v curl >/dev/null 2>&1; then
-  echo "  使用 curl"
-  curl -fL --retry 3 --connect-timeout 20 -o "${ARCHIVE}" "${URL}" && DL_OK=1
-  [ "${DL_OK}" = "0" ] && curl -fLk --retry 3 --connect-timeout 20 -o "${ARCHIVE}" "${URL}" && DL_OK=1
+  echo "  尝试 curl ..."
+  curl -fL --connect-timeout 15 --max-time 180 -o "${ARCHIVE}" "${URL}" && DL_OK=1
+  if [ "${DL_OK}" = "0" ]; then
+    echo "  curl 失败，尝试 curl -k ..."
+    curl -fLk --connect-timeout 15 --max-time 180 -o "${ARCHIVE}" "${URL}" && DL_OK=1
+  fi
 fi
 if [ "${DL_OK}" = "0" ] && command -v wget >/dev/null 2>&1; then
-  echo "  使用 wget"
-  wget -O "${ARCHIVE}" "${URL}" && DL_OK=1
-  [ "${DL_OK}" = "0" ] && wget --no-check-certificate -O "${ARCHIVE}" "${URL}" && DL_OK=1
+  echo "  尝试 wget ..."
+  wget -T 20 -t 2 -O "${ARCHIVE}" "${URL}" && DL_OK=1
+  if [ "${DL_OK}" = "0" ]; then
+    echo "  wget 失败，尝试 wget --no-check-certificate ..."
+    wget --no-check-certificate -T 20 -t 2 -O "${ARCHIVE}" "${URL}" && DL_OK=1
+  fi
 fi
-[ "${DL_OK}" = "1" ] && [ -s "${ARCHIVE}" ] || { echo "! 下载失败"; exit 1; }
+if [ "${DL_OK}" != "1" ] || [ ! -s "${ARCHIVE}" ]; then
+  echo "! 下载失败：请检查设备能否访问 vernawatson.top（可能需要关闭代理/VPN 或换网络）"
+  exit 1
+fi
 echo "- 下载完成: $(stat -c '%s' "${ARCHIVE}") 字节"
 
-# 3. 先解压到临时目录，再拷贝进数据目录（避开 toybox tar 不支持 --strip-components 的问题）
+# 3. 先解压到临时目录，再拷贝进数据目录（兼容 toybox tar）
 echo "- 解压"
 tar -xzf "${ARCHIVE}" -C "${STAGE}" || { echo "! 解压失败"; exit 1; }
 if [ -d "${STAGE}/${PKG}" ]; then
@@ -65,6 +78,7 @@ if [ -d "${STAGE}/${PKG}" ]; then
 else
   cp -a "${STAGE}/." "${DATA_DIR}/" || { echo "! 拷贝失败"; exit 1; }
 fi
+echo "- 解压完成"
 
 # 4. 所有者与用户组全部归应用自己（目录本身 + 全部子文件、子文件夹）
 echo "- 还原所有者 uid=${APP_UID}"
